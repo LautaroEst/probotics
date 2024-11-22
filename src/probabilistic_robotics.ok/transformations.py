@@ -34,3 +34,27 @@ def get_global_pose(measurements, reference_pose):
     measurements_global[:,2] = measurements[:,2] + theta
     
     return measurements_global
+
+
+
+class Robot:
+
+    def __init__(self, x, y, theta):
+        self.x = x
+        self.y = y
+        self.theta = theta
+
+    @property
+    def transformation_matrix(self):
+        return np.array([
+            [np.cos(self.theta), -np.sin(self.theta), self.x], 
+            [np.sin(self.theta), np.cos(self.theta), self.y], 
+            [0, 0, 1]
+        ])
+    
+    def local2global(self, local_measurement):
+        x, y = local_measurement
+        global_measurement = self.transformation_matrix @ np.array([[x, y, 1]]).T
+        return global_measurement[:2].flatten()
+
+        
