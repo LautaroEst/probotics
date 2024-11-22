@@ -28,12 +28,12 @@ def read_sensor_data(filename):
     return data
 
 
-def read_world_data(filename):
-    return pd.read_csv(filename, sep=' ', header=None, names=["id", "x", "y"]).set_index("id")
-
-
 def plot_robot(xt, ax, radius=1, **kwargs):
     x, y, theta = xt
     circle = plt.Circle((x,y), radius, fill=False, color=kwargs.get('color', None))
     ax.add_artist(circle)
     ax.plot([x, x + radius * np.cos(theta)], [y, y + radius * np.sin(theta)], linewidth=2, **kwargs)
+
+
+def evaluate_lognormal(x, mu, sigma):
+    return -np.log(sigma) - 0.5 * np.log(2 * np.pi) - 0.5 * ((x - mu) / sigma) ** 2
