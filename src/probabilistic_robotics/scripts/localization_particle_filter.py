@@ -4,54 +4,37 @@ import numpy as np
 from tqdm import tqdm
 
 from ..localization import ParticleFilter
-from ..utils import read_sensor_data, read_world_data, plot_robot
-
-def get_mean_position(particles):
-    x = 0.0
-    y = 0.0
-    orientation = 0.0
-    
-    for p in particles:
-        x += p[0]
-        y += p[1]
-        orientation += p[2]
-        
-    x /= len(particles)
-    y /= len(particles)
-    orientation /= len(particles)
-    
-    return x, y, orientation
+from ..utils import read_sensor_data
 
 
-def  main(sensor_data, world_data, N, noise_params, seed, plots_dir):
+def  main(sensor_data, world_data, N, odometry_noise_params, sensor_noise, seed, plots_dir):
 
-    noise_params = list(map(float, noise_params.split(',')))
+    # Inicializamos el filtro de partículas
+    sensor_noise = float(sensor_noise)
+    pf = ParticleFilter(N, world_data, odometry_noise_params, sensor_noise, seed)
+
+    # Leemos los datos del sensor
     sensor_data = read_sensor_data(sensor_data)
-    world_data = read_world_data(world_data)
 
-    pf = ParticleFilter(N, random_state=seed)
-    print("Fitting particle filter...")
-    history = pf.fit(sensor_data, world_data, noise_params=noise_params)
+    # Actualización del filtro de partículas y gráfico
+    for t in tqdm(range(len(sensor_data)),total=len(sensor_data)):
 
-    # Plot
-    print("Creating plots...")
-    for t, particles in tqdm(history):
+        # Actualizamos el filtro de partículas
+        pf.update(sensor_data[t]['odom'], sensor_data[t]['sensor'])
 
-        # Obtenemos la posición de las partículas
-        pos = np.array([[p[0], p[1]] for p in particles])
-
-        # Obtenemos la posición promedio
-        mean_pos = get_mean_position(particles)
+        # Obtenemos las poses de las partículas y la posición promedio
+        poses = pf.get_particles_poses()
+        mean_robot = pf.get_mean_robot()
         
         fig, ax = plt.subplots()
-        ax.set_xlim(-1, 18)
-        ax.set_ylim(-1, 18)
+        ax.set_xlim(-2, 12)
+        ax.set_ylim(-2, 12)
         ax.set_aspect('equal')
         ax.grid(True)
-        ax.set_title("Filtro de partículas para ubicar al robot. Timestamp: " + str(t))
-        ax.plot(world_data['x'], world_data['y'], 'ko', markersize=5)
-        ax.plot(pos[:,0], pos[:,1], 'r.')
-        plot_robot(mean_pos, ax, radius=0.5, color='k')
+        ax.set_title("Localización con filtro de partículas y landmarks. Timestamp: " + str(t))
+        ax.plot(pf.sensor.landmarks['x'], pf.sensor.landmarks['y'], 'ko', markersize=5)
+        ax.plot(poses[:,0], poses[:,1], 'r.')
+        mean_robot.plot(ax, radius=0.5, color='k')
         plt.savefig(f"{plots_dir}/plot_{t:03d}.png", dpi=300, bbox_inches="tight")
         plt.close(fig)
 
@@ -63,9 +46,10 @@ if __name__ == "__main__":
     parser.add_argument("--sensor_data", type=str, help="File containing sensor data")
     parser.add_argument("--world_data", type=str, help="File containing world data")
     parser.add_argument('--N', type=int, help='Number of particles', default=100)
-    parser.add_argument("--noise_params", type=str, help="Noise parameters", default="0.1,0.1,0.05,0.05")
+    parser.add_argument("--odometry_noise_params", type=str, help="Noise parameters", default="0.1,0.1,0.05,0.05")
+    parser.add_argument("--sensor_noise", type=float, help="Sensor noise", default=0.1)
     parser.add_argument("--seed", type=int, help="Seed for random number generator", default=1234)
     parser.add_argument("--plots_dir", type=str, help="Directory to save plots", default="plots")
 
     args = parser.parse_args()
-    main(args.sensor_data, args.world_data, args.N, args.noise_params, args.seed, args.plots_dir)
+    main(args.sensor_data, args.world_data, args.N, args.odometry_noise_params, args.sensor_noise, args.seed, args.plots_dir)

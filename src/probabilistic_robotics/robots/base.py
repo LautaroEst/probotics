@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 class Robot:
 
@@ -37,4 +38,10 @@ class Robot:
     
     def apply_movement(self, *args, **kwargs):
         raise NotImplementedError
+
+    def plot(self, ax, radius=1, **kwargs):
+        x, y, theta = self.current_pose
+        circle = plt.Circle((x,y), radius, fill=False, color=kwargs.get('color', None))
+        ax.add_artist(circle)
+        ax.plot([x, x + radius * np.cos(theta)], [y, y + radius * np.sin(theta)], linewidth=2, **kwargs)
 

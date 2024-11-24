@@ -1,57 +1,35 @@
 from math import *
 import numpy as np
-import pandas as pd
+from scipy.special import softmax
 from tqdm import tqdm
 
+from ..robots.cleanodom import CleanOdometryRobot
+from ..sensors.landmarks import LandmarkIdentificator
 
 class KalmanFilter:
 
-    def __init__(self, mu0: np.ndarray, sigma0: np.ndarray):
+    def __init__(self, mu0, sigma0, world_data_path, odometry_noise, measurement_noise):
+        self.robot = CleanOdometryRobot(mu0, seed=0)
+        self.sensor = LandmarkIdentificator.from_file(world_data_path, measurement_noise)
+        self.world_data_path = world_data_path
+        self.odometry_noise = odometry_noise
+        self.measurement_noise = measurement_noise
         self.mu = mu0
         self.sigma = sigma0
 
-    def fit(self, sensor_data: dict, world_data: pd.DataFrame, odometry_noise: np.ndarray, sensor_noise: float):
-        """
-            Argumentos:
-            -----------
-            sensor_data: dict[int][record_type][keys]
-                Diccionario con los datos de los sensores. Cada entrada corresponde a un instante de tiempo
-                en donde la entrada puede ser una medición de odometría (sensor_data[t]['odom']) o de sensor
-                (sensor_data[t]['sensor']).
-            world_data: pd.DataFrame
-                Dataframe con la información del mundo. Cada fila corresponde a un landmark con las columnas
-                'x' y 'y' que representan la posición del landmark.
-            odometry_noise: np.array
-                Covarianza del ruido del modelo de movimiento (matriz Q del modelo).
-            sensor_noise: float
-                Varianza del ruido del sensor (diagonal de la matriz R del modelo).
-            
-            Devuelve:
-            ---------
-            history: list[(int, np.ndarray, np.ndarray)]
-                Lista de tuplas con el tiempo, la media y la covarianza estimadas en 
-                cada instante.
-        """
-        history = []
-        for t in tqdm(range(len(sensor_data))):
-            odometry = sensor_data[t]['odom']
-            sensor = sensor_data[t]['sensor']
-            self.step(odometry, sensor, world_data, odometry_noise, sensor_noise)
-            history.append((t, self.mu, self.sigma))
-        return history
-
-    def step(self, odometry: dict, sensor: dict, world_data: pd.DataFrame, odometry_noise: np.ndarray, sensor_noise: float):
+    def update(self, odometry, sensor):
 
         # Paso de predicción
-        mu_hat, sigma_hat = self.prediction_step(odometry, odometry_noise)
+        mu_hat, sigma_hat = self.prediction_step(odometry)
 
         # Paso de corrección
-        mu, sigma = self.correction_step(mu_hat, sigma_hat, sensor, world_data, sensor_noise)
+        mu, sigma = self.correction_step(mu_hat, sigma_hat, sensor)
+        self.robot.current_pose = mu
 
         self.mu = mu
         self.sigma = sigma
-
-    def prediction_step(self, odometry, noise):
+        
+    def prediction_step(self, odometry):
         """
             Argumentos:
             -----------
@@ -75,10 +53,8 @@ class KalmanFilter:
         dr1, dt, dr2 = odometry['r1'], odometry['t'], odometry['r2']
         
         # Compute the noise free motion.    
-        mu_hat = np.zeros(self.mu.shape)
-        mu_hat[0] = mu_x + dt * np.cos(dr1 + mu_theta)
-        mu_hat[1] = mu_y + dt * np.sin(dr1 + mu_theta)
-        mu_hat[2] = mu_theta + dr1 + dr2
+        self.robot.apply_movement(dr1, dt, dr2)
+        mu_hat = self.robot.current_pose
         
         # Computing the Jacobian of G with respect to the state
         Gt = np.array([
@@ -88,12 +64,12 @@ class KalmanFilter:
         ])
         
         # Predict the covariance
-        sigma_hat = Gt @ self.sigma @ Gt.T + noise
+        sigma_hat = Gt @ self.sigma @ Gt.T + self.odometry_noise
         
         return mu_hat, sigma_hat
     
 
-    def correction_step(self, mu_hat, sigma_hat, sensor_measurement, world_data, noise):
+    def correction_step(self, mu_hat, sigma_hat, sensor_measurement):
         """
             Argumentos:
             -----------
@@ -117,6 +93,9 @@ class KalmanFilter:
                 Covarianza corregida del estado.
         """
         
+        # Landmarks
+        world_data = self.sensor.landmarks
+
         # Read in the state from the uncorrected mu vector
         mu_x, mu_y, mu_theta = mu_hat
         
@@ -144,7 +123,7 @@ class KalmanFilter:
         H[:,2] = 0
             
         # Noise covariance for the measurements
-        R = np.eye(N) * noise
+        R = np.eye(N) * self.measurement_noise
 
         # Gain of Kalman
         K = sigma_hat @ H.T @ np.linalg.inv((H @ sigma_hat @ H.T) + R)    

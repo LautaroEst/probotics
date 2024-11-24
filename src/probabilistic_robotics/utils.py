@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.patches import Ellipse
 
 def read_sensor_data(filename):
     t = 0
@@ -28,12 +29,28 @@ def read_sensor_data(filename):
     return data
 
 
-def plot_robot(xt, ax, radius=1, **kwargs):
-    x, y, theta = xt
-    circle = plt.Circle((x,y), radius, fill=False, color=kwargs.get('color', None))
-    ax.add_artist(circle)
-    ax.plot([x, x + radius * np.cos(theta)], [y, y + radius * np.sin(theta)], linewidth=2, **kwargs)
 
 
 def evaluate_lognormal(x, mu, sigma):
     return -np.log(sigma) - 0.5 * np.log(2 * np.pi) - 0.5 * ((x - mu) / sigma) ** 2
+
+
+
+def plot_ellipse(mu, sigma, ax, color="k"):
+    """
+    Draws ellipse from xy of covariance matrix
+    """
+
+    # Compute eigenvalues and associated eigenvectors
+    vals, vecs = np.linalg.eigh(sigma)
+    # Compute "tilt" of ellipse using first eigenvector
+    x, y = vecs[:, 0]
+    theta = np.degrees(np.arctan2(y, x))
+
+    # Eigenvalues give length of ellipse along each eigenvector
+    w, h = 2 * np.sqrt(vals)
+
+    ellipse = Ellipse(mu, w, h, theta, color=color)  # color="k")
+    ellipse.set_clip_box(ax.bbox)
+    ellipse.set_alpha(0.2)
+    ax.add_artist(ellipse)
