@@ -7,9 +7,9 @@ class NoisyOdometryRobot(Robot):
 
     MIN_SIGMA = 0.00001
 
-    def __init__(self, initial_pose, noise_params, seed=None):
+    def __init__(self, initial_pose, noise_params, radius, seed=None):
         self.noise_params = noise_params
-        super().__init__(initial_pose, seed)
+        super().__init__(initial_pose, radius, seed)
 
     def apply_movement(self, r1, t, r2):
 

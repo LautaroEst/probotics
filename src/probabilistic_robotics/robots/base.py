@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 
 class Robot:
 
-    def __init__(self, initial_pose, seed=None):
+    def __init__(self, initial_pose, radius=1, seed=None):
+        self.radius = radius
         self._rs = np.random.RandomState(seed)
         self._current_pose = initial_pose
         self._pose_history = []
@@ -39,9 +40,9 @@ class Robot:
     def apply_movement(self, *args, **kwargs):
         raise NotImplementedError
 
-    def plot(self, ax, radius=1, **kwargs):
+    def plot(self, ax, **kwargs):
         x, y, theta = self.current_pose
-        circle = plt.Circle((x,y), radius, fill=False, color=kwargs.get('color', None))
+        circle = plt.Circle((x,y), self.radius, fill=False, color=kwargs.get('color', None))
         ax.add_artist(circle)
-        ax.plot([x, x + radius * np.cos(theta)], [y, y + radius * np.sin(theta)], linewidth=2, **kwargs)
+        ax.plot([x, x + self.radius * np.cos(theta)], [y, y + self.radius * np.sin(theta)], linewidth=2, **kwargs)
 

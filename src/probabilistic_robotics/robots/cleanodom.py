@@ -5,8 +5,8 @@ from .base import Robot
 
 class CleanOdometryRobot(Robot):
 
-    def __init__(self, initial_pose, seed=None):
-        super().__init__(initial_pose, seed)
+    def __init__(self, initial_pose, radius=1, seed=None):
+        super().__init__(initial_pose, radius, seed)
 
     def apply_movement(self, r1, t, r2):
 
