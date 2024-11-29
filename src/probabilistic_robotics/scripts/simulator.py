@@ -9,22 +9,26 @@ from scipy.io import loadmat
 from ..robots import *
 from ..sensors import *
 from ..tasks import *
+from ..mapping import *
 
 # ROBOT SPECTS
 RADIUS = 0.35 / 2 # Radio del robot [m]
-WHEELS_RADIUS = 0.072 / 2 # Radio de las ruedas [m]
 WHEELS_DISTANCE = 0.235 # Distancia entre las ruedas [m]
+WHEELS_RADIUS = 0.072 / 2 # Radio de las ruedas [m]
 ALPHA = 0.0015 # Factor de ruido para la simulación
 
 # LIDIAR_SPECS
-SENSOR_OFFSET = (.09, 0) # Posición del sensor en el robot
-MAX_NUM_SCANS = 720 # Número de escaneos por medición
+SENSOR_OFFSET = (.07, 0) # Posición del sensor en el robot
+MAX_NUM_SCANS = 513 # Número de escaneos por medición
 START_ANGLE = -np.pi / 2 # Ángulo inicial de medición
-END_ANGLE = np.pi / 2, # Ángulo final de medición
-MAX_RANGE = 8, # Distancia máxima de medición
+END_ANGLE = np.pi / 2 # Ángulo final de medición
+MAX_RANGE = 5 # Distancia máxima de medición
+MIN_RANGE = 0.06 # Distancia mínima de medición
+OCCUPATION_THRESHOLD = 0.45 # Umbral de ocupación
 
 # SIMULATION SPECS
-MAX_DURATION = 3 * 60  # 3 minutes
+# MAX_DURATION = 3 * 60  # 3 minutes
+MAX_DURATION = 10  # 10 seconds
 SAMPLE_TIME = 0.1  # 100ms
 WAITING_TIME = 5  # 5 seconds
 
@@ -57,20 +61,14 @@ def save_state_for_visualization(history, state):
     })
     
 
-def visualize_history(history, map_data, radius, sensor_offset, start_angle, end_angle, plots_dir):
+def visualize_history(history, map_data, map_resolution, radius, sensor_offset, start_angle, end_angle, plots_dir):
     
-    import pdb; pdb.set_trace()
-
     for i, state in enumerate(history):
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(1,1, figsize=(10,10))
         
         # Plot map
-        ax.imshow(map_data, cmap='gray_r')
-        ax.set_aspect('equal')
-        ax.set_xticks(np.arange(0, map_data.shape[1]+1, 1)-0.5)
-        ax.set_xticklabels([])
-        ax.set_yticks(np.arange(0, map_data.shape[0]+1, 1)-0.5)
-        ax.set_yticklabels([])
+        extent = np.array([0, map_data.shape[1], 0, map_data.shape[0]]) * map_resolution
+        ax.imshow(map_data, cmap='gray_r', extent=extent)
         ax.grid(which='both')
         
         # Plot robot
@@ -88,20 +86,19 @@ def visualize_history(history, map_data, radius, sensor_offset, start_angle, end
         angles = np.linspace(start_angle, end_angle, len(state['ranges']))
         for ang, r in zip(angles, state['ranges']):
             ax.plot([x, x + r * np.cos(theta+ang)], [y, y + r * np.sin(theta+ang)], "b--")
-            ax.plot([x, x + r * np.cos(theta+ang)], [y, y + r * np.sin(theta+ang)], ".", markersize=2)
 
         # Save plots
         plt.savefig(f"{plots_dir}/plot_{i:04d}.png", dpi=300, bbox_inches="tight")
         plt.close(fig)
 
-def read_map(map_path):
-    from PIL import Image
-    map_data  = np.array(Image.open(map_path)) / 255
-    return map_data
+def read_map(map_path, map_resolution):
+    map2d = Map2D.from_image(map_path, map_resolution)
+    return map2d
 
 def main(
     initial_pose,
     map_data_path,
+    map_resolution,
     scale_factor,
     tasks_cfgs,
     plots_dir,
@@ -110,7 +107,7 @@ def main(
 ):
     
     # Lectura del mapa
-    map_data = read_map(map_data_path)
+    map2d = read_map(map_data_path, map_resolution)
 
     # Inicializar el robot
     robot = NoisyDiffDriveRobot(
@@ -129,6 +126,7 @@ def main(
         start_angle = START_ANGLE,
         end_angle = END_ANGLE,
         max_range = MAX_RANGE,
+        threshold = OCCUPATION_THRESHOLD,
         seed = seed,
     )
 
@@ -146,6 +144,9 @@ def main(
     history = []
     state['start_time'] = time.time()
     while time.time() - state['start_time'] < MAX_DURATION:
+        if int(time.time() - state['start_time']) % 1 == 0:
+            print(f"Pose: {state['robot'].current_pose}")
+            print(f"Simulation time: {int(time.time() - state['start_time'])}s", end="\r")
 
         # Tomar el tiempo
         state["cycle_start_time"] = time.time()
@@ -174,7 +175,7 @@ def main(
         else:
             # Aplicar acción diferencial con ruido y guardar la nueva pose
             state['robot'].apply_movement(outputs["linear_velocity"], outputs["angular_velocity"], SAMPLE_TIME)
-            state['sensor'].measure(state['robot'].current_pose, map_data, resolution=1)
+            state['sensor'].measure(state['robot'].current_pose, map2d)
             save_state_for_visualization(history, state)
 
         # Sincronizar
@@ -184,7 +185,7 @@ def main(
             raise RuntimeError("Sample time too short")
 
     if not use_roomba:
-        visualize_history(history, map_data, RADIUS, SENSOR_OFFSET, START_ANGLE, END_ANGLE, plots_dir)
+        visualize_history(history, map2d.map_array, map2d.map_resolution, RADIUS, SENSOR_OFFSET, START_ANGLE, END_ANGLE, plots_dir)
         
 
 
@@ -194,6 +195,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--initial_pose", type=str, default="0,0,0", help="Initial pose")
     parser.add_argument("--map", type=str, default="data/map.mat", help="Path to map")
+    parser.add_argument("--map_resolution", type=float, default=0.05, help="Resolution of the map")
     parser.add_argument("--scans_scale_factor", type=int, default=1, help="Scale factor of the Lidiar scans")
     parser.add_argument("--tasks", type=str, help="List of configs for each task")
     parser.add_argument("--plots_dir", type=str, help="Directory where plots are saved")
@@ -203,4 +205,4 @@ if __name__ == "__main__":
 
     initial_pose = np.array(list(map(float,args.initial_pose.split(","))))
     tasks_cfgs = args.tasks.split(",")
-    main(initial_pose, args.map, args.scans_scale_factor, tasks_cfgs, args.plots_dir, args.use_roomba, args.seed)
+    main(initial_pose, args.map, args.map_resolution, args.scans_scale_factor, tasks_cfgs, args.plots_dir, args.use_roomba, args.seed)

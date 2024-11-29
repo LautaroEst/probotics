@@ -3,7 +3,7 @@ import numpy as np
 
 class Lidar:
 
-    def __init__(self, sensor_offset, num_scans, start_angle, end_angle, max_range, seed=None):
+    def __init__(self, sensor_offset, num_scans, start_angle, end_angle, max_range, threshold=0.5, seed=None):
         self.sensor_offset = np.asarray(sensor_offset)
         self.num_scans = num_scans
         self.start_angle = start_angle
@@ -12,17 +12,23 @@ class Lidar:
         self.max_range = max_range
         self._rs = np.random.RandomState(seed)
         self.ranges = None
+        self.threshold = threshold
 
-    def measure(self, pose, map_data, resolution):
+    def measure(self, pose, map2d):
         lidar_pose = pose + np.hstack((self.sensor_offset, (0,)))
-        inter_points = self.ray_intersection(map_data, resolution, lidar_pose)
+        self.ranges = self.rays_intersection(map2d.map_array, map2d.map_resolution, lidar_pose)
+        return self.ranges
 
     def rays_intersection(self, map_data, resolution, lidar_pose):
-        scan_angles = self.scan_angles + lidar_pose[2]
 
         x, y, theta = lidar_pose
-        x_idx, y_idx = int(x / resolution), int(y / resolution)
-        ranges = np.full_like(scan_angles.angles, self.max_range)
+        scan_angles = self.scan_angles + theta
+        ranges = np.zeros_like(scan_angles)
+
+        xi = int(x / resolution)
+        yi = int(y / resolution)
+        if xi < 0 or yi < 0 or xi >= map_data.shape[1] or yi >= map_data.shape[0] or map_data[map_data.shape[0]-yi, xi] >= self.threshold:
+            return ranges + np.nan
 
         for i, angle in enumerate(scan_angles):
             ray_angle = theta + angle
@@ -36,10 +42,11 @@ class Lidar:
 
                 # Check if ray is out of bounds
                 if xi < 0 or yi < 0 or xi >= map_data.shape[1] or yi >= map_data.shape[0]:
+                    ranges[i] = np.nan
                     break
 
                 # Check if the cell is occupied
-                if map_data[yi, xi] == 1:
+                if map_data[map_data.shape[0]-yi, xi] >= self.threshold:
                     ranges[i] = r
                     break
 
