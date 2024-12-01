@@ -2,8 +2,8 @@
 
 # Params
 initial_pose="10,7,0"
-# map=1er_piso_ala_sur_alig.tiff
-map=mapa_fiuba_1p.tiff
+map=1er_piso_ala_sur_alig.png
+# map=mapa_fiuba_1p.tiff
 map_resolution=0.04 # meters per pixel
 scans_scale_factor=10
 

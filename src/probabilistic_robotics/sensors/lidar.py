@@ -3,16 +3,17 @@ import numpy as np
 
 class Lidar:
 
-    def __init__(self, sensor_offset, num_scans, start_angle, end_angle, max_range, threshold=0.5, seed=None):
+    def __init__(self, sensor_offset, num_scans, start_angle, end_angle, min_range, max_range, occupation_threshold=0.5, seed=None):
         self.sensor_offset = np.asarray(sensor_offset)
         self.num_scans = num_scans
         self.start_angle = start_angle
         self.end_angle = end_angle
         self.scan_angles = np.linspace(start_angle, end_angle, int(num_scans))
+        self.min_range = min_range
         self.max_range = max_range
         self._rs = np.random.RandomState(seed)
         self.ranges = None
-        self.threshold = threshold
+        self.threshold = occupation_threshold
 
     def measure(self, pose, map2d):
         lidar_pose = pose + np.hstack((self.sensor_offset, (0,)))

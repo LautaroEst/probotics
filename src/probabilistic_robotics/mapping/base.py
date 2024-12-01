@@ -12,5 +12,6 @@ class Map2D:
     @classmethod
     def from_image(cls, map_path, map_resolution):
         from PIL import Image
-        map_data  = 1 - np.array(Image.open(map_path)) / 255
+        img = Image.open(map_path).convert('L')
+        map_data  = 1 - np.array(img) / 255
         return cls(map_data, map_resolution)
