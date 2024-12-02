@@ -1,4 +1,5 @@
 task: "Explore"
-safe_distance: 1
+safe_distance: 0.5
 max_linear_velocity: 0.15
 max_angular_velocity: 0.5
+min_linear_velocity: 0.05
