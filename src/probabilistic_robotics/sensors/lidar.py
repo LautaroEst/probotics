@@ -4,6 +4,8 @@ import numpy as np
 class Lidar:
 
     def __init__(self, sensor_offset, num_scans, start_angle, end_angle, min_range, max_range, occupation_threshold=0.5, seed=None):
+
+        self.current_pose = None
         self.sensor_offset = np.asarray(sensor_offset)
         self.num_scans = num_scans
         self.start_angle = start_angle
@@ -12,11 +14,27 @@ class Lidar:
         self.min_range = min_range
         self.max_range = max_range
         self._rs = np.random.RandomState(seed)
-        self.ranges = None
+        self.ranges = np.ones(num_scans) * np.nan
         self.threshold = occupation_threshold
 
-    def measure(self, pose, map2d):
-        lidar_pose = pose + np.hstack((self.sensor_offset, (0,)))
+    def measure(self, robot_pose, map2d):
+
+        # Robot pose
+        x, y, theta = robot_pose
+
+        # Matriz de cambio de base de la terna global a la terna local.
+        T = np.array([
+            [np.cos(theta), -np.sin(theta), x], 
+            [np.sin(theta), np.cos(theta), y], 
+            [0, 0, 1]
+        ])
+        
+        # Lidar pose
+        lidar_pose = np.hstack((self.sensor_offset, (1,))) @ T.T
+        lidar_pose[2] = theta
+        self.current_pose = lidar_pose
+
+        # Ranges
         self.ranges = self.rays_intersection(map2d.map_array, map2d.map_resolution, lidar_pose)
         return self.ranges
 
@@ -31,8 +49,7 @@ class Lidar:
         if xi < 0 or yi < 0 or xi >= map_data.shape[1] or yi >= map_data.shape[0] or map_data[map_data.shape[0]-yi, xi] >= self.threshold:
             return ranges + np.nan
 
-        for i, angle in enumerate(scan_angles):
-            ray_angle = theta + angle
+        for i, ray_angle in enumerate(scan_angles):
             sin_theta = np.sin(ray_angle)
             cos_theta = np.cos(ray_angle)
 

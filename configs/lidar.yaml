@@ -4,4 +4,4 @@ start_angle: -1.5707963267948966 # Ángulo inicial de medición (-pi/2)
 end_angle: 1.5707963267948966 # Ángulo final de medición (pi/2)
 max_range: 5 # Distancia máxima de medición
 min_range: 0.06 # Distancia mínima de medición
-occupation_threshold: 0.45 # Umbral de ocupación
+occupation_threshold: 0.15 # Umbral de ocupación

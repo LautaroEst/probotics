@@ -1,4 +1,4 @@
-initial_pose: [10, 15, 0.0] # Posición inicial del robot [x, y, theta]
+initial_pose: [9, 15, 0.0] # Posición inicial del robot [x, y, theta]
 radius: 0.175 # Radio del robot [m]
 wheels_distance: 0.235 # Distancia entre las ruedas [m]
 wheels_radius: 0.036 # Radio de las ruedas [m]

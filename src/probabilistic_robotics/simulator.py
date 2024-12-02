@@ -43,11 +43,22 @@ class Simulator:
         self.seed = seed
 
     def run(self):
+        try:
+            self._run()
+        except KeyboardInterrupt:
+            robot_pose = self.robot.current_pose
+            lidar_pose = self.lidar.current_pose
+            path = []
+            ranges = self.lidar.ranges
+            self._plot_realtime(robot_pose, lidar_pose, path, ranges)
+
+    def _run(self):
 
         # Estado actual
         state = {
             "robot": self.robot,
             "sensor": self.lidar,
+            "map": self.map2d,
             "task_status": "not_started",
             "current_task_id": 0,
             "cycle_start_time": None,
@@ -86,7 +97,8 @@ class Simulator:
 
             # Plotting
             self._plot_realtime(
-                pose=state["robot"].current_pose,
+                robot_pose=state["robot"].current_pose,
+                lidar_pose=state["sensor"].current_pose,
                 path=[],
                 ranges=state["sensor"].ranges,
             )
@@ -113,7 +125,7 @@ class Simulator:
             tasks.append(task)
         return tasks
 
-    def _plot_realtime(self, pose, path, ranges):
+    def _plot_realtime(self, robot_pose, lidar_pose, path, ranges):
         
         # Clear axis
         self.ax.cla()
@@ -124,7 +136,7 @@ class Simulator:
         self.ax.grid(which='both')
         
         # Plot robot
-        robot = Robot(pose, self.robot.wheels_radius)
+        robot = Robot(robot_pose, radius=self.robot.radius)
         robot.plot(self.ax, color="k")
         
         # Plot path
@@ -132,9 +144,7 @@ class Simulator:
             self.ax.plot(dot[0], dot[1], "r.", markersize=4)
 
         # Plot lidar
-        x, y, theta = pose
-        x += self.lidar.sensor_offset[0]
-        y += self.lidar.sensor_offset[1]
+        x, y, theta = lidar_pose
         angles = np.linspace(self.lidar.start_angle, self.lidar.end_angle, len(ranges))
         for ang, r in zip(angles, ranges):
             self.ax.plot([x, x + r * np.cos(theta+ang)], [y, y + r * np.sin(theta+ang)], "b--")
