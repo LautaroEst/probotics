@@ -4,3 +4,7 @@
 
 /outputs/
 /.vscode/
+/build/
+/devel/
+CMakeLists.txt
+package.xml

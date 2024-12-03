@@ -6,10 +6,10 @@ import matplotlib.pyplot as plt
 import yaml
 import importlib
 
-from .robots import *
-from .sensors import *
-from .tasks import *
-from .mapping import *
+from ..src.robots import *
+from ..src.sensors import *
+from ..src.tasks import *
+from ..src.mapping import *
 
 class Simulator:
 
