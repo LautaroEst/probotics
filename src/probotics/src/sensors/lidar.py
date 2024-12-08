@@ -17,8 +17,7 @@ class Lidar:
         self.ranges = np.ones(num_scans) * np.nan
         self.threshold = occupation_threshold
 
-    def measure(self, robot_pose, map2d):
-
+    def update_lidar_pose(self, robot_pose):
         # Robot pose
         x, y, theta = robot_pose
 
@@ -34,13 +33,18 @@ class Lidar:
         lidar_pose[2] = theta
         self.current_pose = lidar_pose
 
+    def measure(self, robot_pose, map2d):
+        
+        # Update lidar pose
+        self.update_lidar_pose(robot_pose)
+
         # Ranges
-        self.ranges = self.rays_intersection(map2d.map_array, map2d.map_resolution, lidar_pose)
+        self.ranges = self.rays_intersection(map2d.map_array, map2d.map_resolution)
         return self.ranges
 
-    def rays_intersection(self, map_data, resolution, lidar_pose):
+    def rays_intersection(self, map_data, resolution):
 
-        x, y, theta = lidar_pose
+        x, y, theta = self.current_pose
         scan_angles = self.scan_angles + theta
         ranges = np.zeros_like(scan_angles)
 

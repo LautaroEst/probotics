@@ -1,7 +1,9 @@
+import importlib
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Ellipse
+import yaml
 
 def read_sensor_data(filename):
     t = 0
@@ -29,7 +31,23 @@ def read_sensor_data(filename):
     return data
 
 
+def load_yaml(path):
+    with open(path, "r") as f:
+        file = yaml.safe_load(f)
+    if file is None:
+        return {}
+    return file
 
+def read_tasks(tasks_cfgs):
+    tasks = []
+    module = importlib.import_module('.tasks', package=__package__)
+    for cfg in tasks_cfgs:
+        cfg = load_yaml(f"../configs/{cfg}.yaml")
+        task_name = cfg.pop('task')
+        task_cls = getattr(module, task_name)
+        task = task_cls(**cfg)
+        tasks.append(task)
+    return tasks
 
 def evaluate_lognormal(x, mu, sigma):
     return -np.log(sigma) - 0.5 * np.log(2 * np.pi) - 0.5 * ((x - mu) / sigma) ** 2

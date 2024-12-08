@@ -1,45 +1,63 @@
 
+import os
 import matplotlib.pyplot as plt
 import time
 import numpy as np
 import matplotlib.pyplot as plt
-import yaml
-import importlib
 
-from ..src.robots import *
-from ..src.sensors import *
-from ..src.tasks import *
-from ..src.mapping import *
+from ..robots import *
+from ..sensors import *
+from ..tasks import *
+from ..mapping import *
+from ..utils import read_tasks
+
+import mpld3
 
 class Simulator:
 
-    def __init__(self, map_cfg, robot_cfg, sensor_cfg, tasks_cfgs, scans_scale_factor, use_roomba=False, max_duration=10, sample_time=0.1, xlims=None, ylims=None, seed=None):
-        self.fig, self.ax = plt.subplots(1,1, figsize=(5,5))
-        plt.ion()
-        self.fig.show()
+    def __init__(
+        self, 
+        seed=None,
+        max_duration=10, 
+        sample_time=0.1,
+        scans_scale_factor=1, 
+        sensor_offset=(0., 0.),
+        num_scans=200,
+        start_angle=-np.pi/2,
+        end_angle=np.pi/2,
+        max_range=10,
+        min_range=0.0,
+        occupation_threshold=0.5,
+        initial_pose=(0, 0, 0),
+        radius=0.5,
+        wheels_distance=0.2,
+        wheels_radius=0.05,
+        alpha=0.1,
+        map_path="",
+        map_resolution=0.05,
+        tasks=[],
+    ):
+
+        # Inicializamos los gráficos
+        self._init_plot()
 
         # Lectura del mapa
-        self.map_cfg = self._load_yaml(map_cfg)
-        self.map2d = Map2D.from_image(**self.map_cfg)
+        self.map2d = Map2D.from_image(map_path, map_resolution)
 
         # Inicializar el robot
-        self.robot_config = self._load_yaml(robot_cfg)
-        self.robot = NoisyDiffDriveRobot(seed=seed, **self.robot_config)
+        initial_pose = np.asarray(initial_pose)
+        self.robot = NoisyDiffDriveRobot(initial_pose, radius, wheels_radius, wheels_distance, alpha, seed)
 
         # Inicializar el lidar
-        self.sensor_cfg = self._load_yaml(sensor_cfg)
-        self.sensor_cfg["num_scans"] = self.sensor_cfg["num_scans"] // scans_scale_factor
-        self.lidar = Lidar(seed=seed, **self.sensor_cfg)
+        num_scans = num_scans // scans_scale_factor
+        self.lidar = Lidar(sensor_offset, num_scans, start_angle, end_angle, min_range, max_range, occupation_threshold, seed)
 
         # Tareas:
-        self.tasks = self._read_tasks(tasks_cfgs)    
+        self.tasks = read_tasks(tasks)    
 
         # Parámetros de simulación
-        self.use_roomba = use_roomba
         self.max_duration = max_duration
         self.sample_time = sample_time
-        self.xlims = xlims
-        self.ylims = ylims
         self.seed = seed
 
     def run(self):
@@ -78,8 +96,11 @@ class Simulator:
             current_task = self.tasks[state["current_task_id"]]
             if state["task_status"] == "not_started":
                 current_task.start(state)
-                if time.time() - state["cycle_start_time"] < self.sample_time:
-                    time.sleep(self.sample_time - (time.time() - state['cycle_start_time']))
+                # Sincronizar con el tiempo de muestreo
+                n = 1
+                while (time.time() - state["cycle_start_time"]) / (self.sample_time * n) > 1:
+                    n += 1
+                time.sleep(self.sample_time * n - (time.time() - state['cycle_start_time']))
                 continue
             elif state["task_status"] == "running":
                 outputs = current_task.run_cycle(state)
@@ -88,42 +109,28 @@ class Simulator:
             else:
                 raise ValueError("Not a valid task status")
 
-            if self.use_roomba:
-                pass
-            else:
-                # Aplicar acción diferencial con ruido y guardar la nueva pose
-                state['robot'].apply_movement(outputs["linear_velocity"], outputs["angular_velocity"], self.sample_time)
-                state['sensor'].measure(state['robot'].current_pose, self.map2d)
+            # Aplicar acción diferencial con ruido y guardar la nueva pose
+            state['robot'].apply_movement(outputs["linear_velocity"], outputs["angular_velocity"], self.sample_time)
+            state['sensor'].measure(state['robot'].current_pose, self.map2d)
 
-            # Plotting
+            # Graficar
             self._plot_realtime(
                 robot_pose=state["robot"].current_pose,
                 lidar_pose=state["sensor"].current_pose,
                 path=[],
                 ranges=state["sensor"].ranges,
             )
-            if time.time() - state["cycle_start_time"] < self.sample_time:
-                time.sleep(self.sample_time - (time.time() - state['cycle_start_time']))
-            else:
-                raise RuntimeError("Sample time too short")
 
-    def _load_yaml(self, path):
-        with open(path, "r") as f:
-            file = yaml.safe_load(f)
-        if file is None:
-            return {}
-        return file
+            # Sincronizar con el tiempo de muestreo
+            n = 1
+            while (time.time() - state["cycle_start_time"]) / (self.sample_time * n) > 1:
+                n += 1
+            time.sleep(self.sample_time * n - (time.time() - state['cycle_start_time']))
 
-    def _read_tasks(self, tasks_cfgs):
-        tasks = []
-        module = importlib.import_module('.tasks', package=__package__)
-        for cfg in tasks_cfgs:
-            cfg = self._load_yaml(cfg + ".yaml")
-            task_name = cfg.pop('task')
-            task_cls = getattr(module, task_name)
-            task = task_cls(**cfg)
-            tasks.append(task)
-        return tasks
+    def _init_plot(self):
+        self.fig, self.ax = plt.subplots(1,1, figsize=(5,5))
+        plt.ion()
+        self.fig.show()
 
     def _plot_realtime(self, robot_pose, lidar_pose, path, ranges):
         
@@ -150,8 +157,4 @@ class Simulator:
             self.ax.plot([x, x + r * np.cos(theta+ang)], [y, y + r * np.sin(theta+ang)], "b--")
 
         # Update plot
-        if self.xlims is not None:
-            self.ax.set_xlim(*self.xlims)
-        if self.ylims is not None:
-            self.ax.set_ylim(*self.ylims)
         self.fig.canvas.draw()

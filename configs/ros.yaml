@@ -1,0 +1,10 @@
+ros_ip: 127.0.0.1
+ros_master_uri: http://127.0.0.1:11311
+
+max_duration: 300 # Duración máxima de la simulación [s]
+sample_time: 0.1 # Tiempo de muestreo [s]
+lidar_offset: [0.07, 0] # Posición del sensor en el robot
+radius: 0.175 # Radio del robot [m]
+
+tasks:
+  - explore

@@ -1,11 +1,13 @@
 
+import argparse
+
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
-from ..slam.fastslam import FastSLAM
-from ..utils import read_sensor_data, plot_ellipse
-from ..sensors.landmarks import LandmarkIdentificator
+from ..src.slam.fastslam import FastSLAM
+from ..src.utils import read_sensor_data, plot_ellipse
+from ..src.sensors.landmarks import LandmarkIdentificator
 
 
 def plot_landmarks_with_ellipsoids(ax, robot_pose, landmarks):
@@ -48,11 +50,8 @@ def main(N, odometry_noise_params, measurement_noise, sensor_data, world_data, p
         plt.close(fig)
 
 
-
-if __name__ == "__main__":
-    from argparse import ArgumentParser
-
-    parser = ArgumentParser()
+def setup(command_args):
+    parser = argparse.ArgumentParser()
     parser.add_argument('--N', type=int, help='Number of particles', default=100)
     parser.add_argument("--odometry_noise_params", type=str, help="Noise parameters", default="0.1,0.1,0.05,0.05")
     parser.add_argument("--sensor_noise", type=float, help="Sensor noise", default=0.1)
@@ -60,6 +59,21 @@ if __name__ == "__main__":
     parser.add_argument("--world_data", help="File containing world data")
     parser.add_argument("--plots_dir", help="Directory to save plots", default="plots")
     parser.add_argument("--seed", type=int, help="Seed for random number generator", default=1234)
+    args = parser.parse_args(command_args)
+    
+    main(
+        args.N, 
+        list(map(float, args.odometry_noise_params.split(','))), 
+        args.sensor_noise, 
+        args.sensor_data, 
+        args.world_data, 
+        args.plots_dir, 
+        args.seed
+    )
 
-    args = parser.parse_args()
-    main(args.N, list(map(float, args.odometry_noise_params.split(','))), args.sensor_noise, args.sensor_data, args.world_data, args.plots_dir, args.seed)
+
+if __name__ == "__main__":
+    import sys
+    setup(sys.argv[1:])
+    
+    

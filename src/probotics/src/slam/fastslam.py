@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from ..robots.gaussiannoisyodom import GaussianNoisyOdometryRobot
+from ..robots import GaussianNoisyOdometryRobot
 from ..sensors.landmarks import LandmarkIdentificator
 
 

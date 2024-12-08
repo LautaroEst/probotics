@@ -1,10 +1,11 @@
 
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
 
-from ..localization import KalmanFilter
-from ..utils import read_sensor_data, plot_ellipse
+from ..src.localization import KalmanFilter
+from ..src.utils import read_sensor_data, plot_ellipse
 
 
 Qt = np.array([[0.2, 0.0, 0.0],[0.0, 0.2, 0.0],[0.0, 0.0, 0.02]])
@@ -39,13 +40,20 @@ def  main(sensor_data, world_data, plots_dir):
         plt.close(fig)
 
 
-if __name__ == "__main__":
-    from argparse import ArgumentParser
-
-    parser = ArgumentParser()
+def setup(command_args):
+    parser = argparse.ArgumentParser()
     parser.add_argument("--sensor_data", help="File containing sensor data")
     parser.add_argument("--world_data", help="File containing world data")
     parser.add_argument("--plots_dir", help="Directory to save plots", default="plots")
+    args = parser.parse_args(command_args)
+    
+    main(
+        args.sensor_data, 
+        args.world_data, 
+        args.plots_dir
+    )
 
-    args = parser.parse_args()
-    main(args.sensor_data, args.world_data, args.plots_dir)
+
+if __name__ == "__main__":
+    import sys
+    setup(sys.argv[1:])

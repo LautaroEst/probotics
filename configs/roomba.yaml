@@ -1,5 +1,0 @@
-initial_pose: [9, 15, 0.0] # Posición inicial del robot [x, y, theta]
-radius: 0.175 # Radio del robot [m]
-wheels_distance: 0.235 # Distancia entre las ruedas [m]
-wheels_radius: 0.036 # Radio de las ruedas [m]
-alpha: 0.0015 # Factor de ruido para la simulación

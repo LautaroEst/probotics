@@ -1,0 +1,30 @@
+
+# Configuración de la simulación
+seed: null
+max_duration: 300 # Duración máxima de la simulación [s]
+sample_time: 0.1 # Tiempo de muestreo [s]
+
+# Especificaciones del LIDAR
+sensor_offset: [0.07, 0] # Posición del sensor en el robot
+num_scans: 513 # Número de escaneos por medición
+start_angle: -1.5707963267948966 # Ángulo inicial de medición (-pi/2)
+end_angle: 1.5707963267948966 # Ángulo final de medición (pi/2)
+max_range: 5 # Distancia máxima de medición
+min_range: 0.06 # Distancia mínima de medición
+occupation_threshold: 0.15 # Umbral de ocupación
+scans_scale_factor: 10 # Factor de escala para graficar los escaneos
+
+# Especificaciones del robot
+initial_pose: [9, 15, 0.0] # Posición inicial del robot [x, y, theta]
+radius: 0.175 # Radio del robot [m]
+wheels_distance: 0.235 # Distancia entre las ruedas [m]
+wheels_radius: 0.036 # Radio de las ruedas [m]
+alpha: 0.0015 # Factor de ruido para la simulación
+
+# Especificaciones del mapa
+map_path: "../data/simulation/1er_piso_ala_sur_alig.png" # Archivo con el mapa
+map_resolution: 0.04 # Resolución del mapa [m]
+
+# Tareas
+tasks:
+  - explore

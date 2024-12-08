@@ -1,26 +1,26 @@
 
-from .scripts.localization_particle_filter import main as particle_filter
-from .scripts.localization_kf import main as kalman
-from .scripts.fastslam import main as fastslam
-from .scripts.planning import main as planning
-from .scripts.simulator import main as simulator
+from .scripts.localization_particle_filter import setup as particle_filter
+from .scripts.localization_kf import setup as kalman
+from .scripts.fastslam import setup as fastslam
+from .scripts.planning import setup as planning
+from .scripts.simulator import setup as simulator
 
-def main(action, *args):
+def setup(action, *args):
     if action == "particle_filter":
-        particle_filter(*args)
+        particle_filter(args)
     elif action == "kalman":
-        kalman(*args)
+        kalman(args)
     elif action == "fastslam":
-        fastslam(*args)
+        fastslam(args)
     elif action == "planning":
-        planning(*args)
+        planning(args)
     elif action == "simulator":
-        simulator(*args)
+        simulator(args)
     else:
         raise ValueError("Not a valid action")
 
 if __name__ == "__main__":
     import sys
     args = sys.argv[1:]
-    main(*args)
+    setup(*args)
 

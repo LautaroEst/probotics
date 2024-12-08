@@ -1,11 +1,12 @@
 
+import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-from ..planning.dijkstra import Dijkstra
-from ..planning.a_star import AStar
+from ..src.planning.dijkstra import Dijkstra
+from ..src.planning.a_star import AStar
 
 def read_map(map_path):
     map_data = pd.read_csv(map_path, header=None, index_col=None, sep=' ', skiprows=5)
@@ -61,9 +62,7 @@ def main(map_path, start, goal, method, factor, threshold, plots_dir):
     plt.close(fig)
     
 
-if __name__ == "__main__":
-    import argparse
-
+def setup(command_args):
     parser = argparse.ArgumentParser()
     parser.add_argument("--map_path", type=str, help="Path to the map file")
     parser.add_argument("--start", type=str, help="Start position")
@@ -72,8 +71,21 @@ if __name__ == "__main__":
     parser.add_argument("--factor", type=int, default=1, help="Factor to scale the heuristic")
     parser.add_argument("--threshold", type=float, default=0.5, help="Threshold for the map")
     parser.add_argument("--plots_dir", type=str, help="Path to the directory where the plots will be saved")
+    args = parser.parse_args(command_args)
     
-    args = parser.parse_args()
     start = np.array(list(map(int, args.start.split(','))))
     goal = np.array(list(map(int, args.goal.split(','))))
-    main(args.map_path, start, goal, args.method, args.factor, args.threshold, args.plots_dir)
+    main(
+        args.map_path, 
+        start, 
+        goal, 
+        args.method, 
+        args.factor, 
+        args.threshold, 
+        args.plots_dir
+    )
+
+if __name__ == "__main__":
+    import sys
+    setup(sys.argv[1:])
+    
