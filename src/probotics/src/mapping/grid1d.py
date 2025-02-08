@@ -7,6 +7,7 @@ class GridMapping1D:
 
     def __init__(self, prior, grid_size, grid_interval, backgroud_limit):
         self.belief = np.ones(grid_size + 1) * prior
+        self.logodds_0 = logit(self.belief)
         self.grid_size = grid_size
         self.grid_interval = grid_interval
         self.backgroud_limit = backgroud_limit
@@ -54,15 +55,6 @@ class GridMapping1D:
         logodds = logit(belief)
         return logodds
 
-    def fit(self, measurements):
-        belief = self.belief
-        logodds_0 = logit(self.belief)
-        logodds = logit(self.belief)
-
-        history = [belief]
-        for robot_position, z in measurements:
-            logodds += self.inverse_sensor_model(belief, robot_position, z) - logodds_0
-            belief = expit(logodds)
-            history.append(belief)
-        self.belief = belief
-        return history
+    def update(self, robot_position, z):
+        new_loggods = logit(self.belief) + self.inverse_sensor_model(self.belief, robot_position, z) - self.logodds_0
+        self.belief = expit(new_loggods)

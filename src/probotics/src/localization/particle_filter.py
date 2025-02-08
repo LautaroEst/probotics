@@ -32,10 +32,10 @@ class ParticleFilter:
 
     def correction_step(self, sensor):
         new_weights = []
-        for particle in self.particles:
-            logprob = self.sensor.measurement_prob_range(particle.current_pose, sensor['id'], sensor['range'])
-            new_weights.append(logprob)
-        self.weights = softmax(new_weights)
+        for w, particle in zip(self.weights, self.particles):
+            prob = self.sensor.measurement_prob_range(particle.current_pose, sensor['id'], sensor['range'])
+            new_weights.append(w * prob)
+        self.weights = np.array(new_weights) / sum(new_weights)
 
     def update(self, odometry, sensor):
 
@@ -53,15 +53,15 @@ class ParticleFilter:
         y = 0.0
         theta = 0.0
         
-        for p in self.particles:
+        for w, p in zip(self.weights, self.particles):
             px, py, ptheta = p.current_pose
-            x += px
-            y += py
-            theta += ptheta
+            x += w * px
+            y += w * py
+            theta += w * ptheta
             
-        x /= len(self.particles)
-        y /= len(self.particles)
-        theta /= len(self.particles)
+        x /= np.sum(self.weights)
+        y /= np.sum(self.weights)
+        theta /= np.sum(self.weights)
         
         mean_pos = np.array([x, y, theta])
         mean_robot = NoisyOdometryRobot(mean_pos, self.odometry_noise_params, self.radius)
@@ -74,23 +74,26 @@ class ParticleFilter:
     def get_particles_poses(self):
         return np.vstack([p.current_pose for p in self.particles])
     
-    def systematic_resampling(self):
-        
-        N = len(self.particles)
-        cum_w = np.cumsum(self.weights)
+    def systematic_resample(self):
+        N = len(self.weights)
 
-        seed = self.rs.rand() / N
-        pointers = np.arange(N) / N + seed
+        positions = (np.arange(N) + self.rs.rand()) / N
+
+        indexes = np.zeros(N, dtype=int)
+        cumulative_sum = np.cumsum(self.weights)
+        i, j = 0, 0
+        while i < N:
+            if positions[i] < cumulative_sum[j]:
+                indexes[i] = j
+                i += 1
+            else:
+                j += 1
 
         new_particles = []
-        new_weights = []
-        for point in pointers:
-            i = 0
-            while point > cum_w[i]:
-                i += 1
-            new_particles.append(self.particles[i])
-            new_weights.append(1/N)
-
-        # Normalize weights    
-        new_weights = np.array(new_weights) / np.sum(new_weights)
+        for i, seed in enumerate(self.rs.permutation(N)):
+            pose = self.particles[indexes[i]].current_pose
+            p = NoisyOdometryRobot(pose, self.odometry_noise_params, self.radius, seed)
+            new_particles.append(p)
         self.particles = new_particles
+        self.weights = np.ones(N) / N
+        return self

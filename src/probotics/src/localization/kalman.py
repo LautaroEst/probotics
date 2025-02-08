@@ -1,5 +1,7 @@
 from math import *
+from pathlib import Path
 import numpy as np
+import pandas as pd
 from scipy.special import softmax
 from tqdm import tqdm
 
@@ -8,16 +10,27 @@ from ..sensors.landmarks import LandmarkIdentificator
 
 class KalmanFilter:
 
-    def __init__(self, mu0, sigma0, world_data_path, odometry_noise, measurement_noise):
-        self.robot = CleanOdometryRobot(mu0, seed=0)
-        self.sensor = LandmarkIdentificator.from_file(world_data_path, measurement_noise)
-        self.world_data_path = world_data_path
+    def __init__(self, mu0, sigma0, world_data, odometry_noise, measurement_noise, robot_radius=1):
+        self.robot = CleanOdometryRobot(mu0, radius=robot_radius, seed=0)
+        self._read_world_data(world_data, measurement_noise)
+        self.world_data = world_data
         self.odometry_noise = odometry_noise
         self.measurement_noise = measurement_noise
         self.mu = mu0
         self.sigma = sigma0
 
-    def update(self, odometry, sensor):
+    def _read_world_data(self, world_data, measurement_noise):
+        if isinstance(world_data, str):
+            if Path(world_data).exists():
+                self.sensor = LandmarkIdentificator.from_file(world_data, measurement_noise)
+            else:
+                raise FileNotFoundError(f"File {world_data} not found")
+        elif isinstance(world_data, pd.DataFrame):
+            self.sensor = LandmarkIdentificator(world_data, measurement_noise)
+        else:
+            raise ValueError("world_data must be a path to a file or a pandas DataFrame")
+
+    def update(self, odometry: dict, sensor: dict):
 
         # Paso de predicción
         mu_hat, sigma_hat = self.prediction_step(odometry)
@@ -69,7 +82,7 @@ class KalmanFilter:
         return mu_hat, sigma_hat
     
 
-    def correction_step(self, mu_hat, sigma_hat, sensor_measurement):
+    def correction_step(self, mu_hat, sigma_hat, sensor):
         """
             Argumentos:
             -----------
@@ -77,13 +90,8 @@ class KalmanFilter:
                 Media predicha del estado.
             sigma_hat: np.ndarray
                 Covarianza predicha del estado.
-            sensor_measurement: dict
+            sensor: dict
                 Diccionario con las lecturas del sensor. Las claves son 'id' y 'range'.
-            world_data: pd.DataFrame
-                Dataframe con la información del mundo. Cada fila corresponde a un landmark con las columnas
-                'x' y 'y' que representan la posición del landmark.
-            noise: float
-                Varianza del ruido del sensor.
 
             Devuelve:
             ---------
@@ -100,9 +108,9 @@ class KalmanFilter:
         mu_x, mu_y, mu_theta = mu_hat
         
         # Read in the ids and ranges from measurements using dictionary indexing
-        arg = np.argsort(sensor_measurement['id'])
-        ids = np.asarray(sensor_measurement['id'])[arg]   
-        ranges = np.asarray(sensor_measurement['range'])[arg]   
+        arg = np.argsort(sensor['id'])
+        ids = np.asarray(sensor['id'])[arg]   
+        ranges = np.asarray(sensor['range'])[arg]   
         
         # Initialize the Jacobian h
         N = np.size(ids)
