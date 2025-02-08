@@ -25,7 +25,7 @@ class LandmarkIdentificator:
             y_landmark = self.landmarks.loc[indices[i],'y']
             mu = np.sqrt((x - x_landmark)**2 + (y - y_landmark)**2)
             logprob += evaluate_lognormal(ranges[i], mu, self.sensor_noise)
-        return logprob
+        return logprob - np.log(N)
     
     def measurement_model(self, current_pose, landmark_id):
 
