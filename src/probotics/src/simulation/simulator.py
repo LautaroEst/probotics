@@ -11,7 +11,7 @@ from ..tasks import *
 from ..mapping import *
 from ..utils import read_tasks
 
-import mpld3
+# import mpld3
 
 class Simulator:
 

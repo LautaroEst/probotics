@@ -1,7 +1,6 @@
 
 import numpy as np
 import pandas as pd
-import scipy
 
 from ..utils import evaluate_lognormal
    
@@ -12,30 +11,20 @@ class LandmarkIdentificator:
         self.landmarks = landmarks
         self.sensor_noise = sensor_noise
 
-    def eval_measure(self, current_pose, indices, ranges):
-        """ computes the probability of a measurement 
-        """
+    def measurement_prob_range(self, current_pose, indices, ranges):
+        # Calcula la probabilidad medir current_pose dadas las mediciones (indices, ranges)
+        
         x, y, _ = current_pose
 
-        prob = 1
+        logprob = 0
         for idx, rng in zip(indices, ranges):
-            x_landmark = self.landmarks.loc[idx, 'x']
-            y_landmark = self.landmarks.loc[idx, 'y']
-            distance = np.linalg.norm([x - x_landmark, y - y_landmark])
-            prob *= scipy.stats.norm(distance, self.sensor_noise).pdf(rng)
-        
+            x_landmark = self.landmarks.loc[idx,'x']
+            y_landmark = self.landmarks.loc[idx,'y']
+            mu = np.sqrt((x - x_landmark)**2 + (y - y_landmark)**2)
+            logprob += evaluate_lognormal(rng, mu, self.sensor_noise)
+        prob = np.exp(logprob)
         prob += 1.e-300 # avoid round-off to zero
         return prob
-
-        # N = len(indices)
-        # logprob = 0
-        # for i in range(N):
-        #     x_landmark = self.landmarks.loc[indices[i],'x']
-        #     y_landmark = self.landmarks.loc[indices[i],'y']
-        #     mu = np.sqrt((x - x_landmark)**2 + (y - y_landmark)**2)
-        #     logprob += evaluate_lognormal(ranges[i], mu, self.sensor_noise)
-        # # return logprob - np.log(N)
-        # return logprob
     
     # def measurement_model(self, current_pose, landmark_id):
 

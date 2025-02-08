@@ -12,7 +12,7 @@ class ParticleFilter:
         rs = np.random.RandomState(seed)
         particles = []
         for i in range(N):
-            initial_pose = np.array([rs.rand() * 15, rs.rand() * 15, rs.rand() * 2 * np.pi - np.pi])
+            initial_pose = np.array([rs.randn(), rs.randn(), rs.rand() * 2 * np.pi - np.pi])
             p = NoisyOdometryRobot(initial_pose, odometry_noise_params, radius, seed+i)
             particles.append(p)
 
@@ -26,74 +26,63 @@ class ParticleFilter:
         self.measurement_noise = measurement_noise
         self.rs = rs
 
+
     def prediction_step(self, odometry):
+        # Implementación del paso de predicción
         for particle in self.particles:
             particle.apply_movement(odometry['r1'], odometry['t'], odometry['r2'])
 
+
     def correction_step(self, sensor):
-        new_weights = []
-        for w, particle in zip(self.weights, self.particles):
-            prob = self.sensor.measurement_prob_range(particle.current_pose, sensor['id'], sensor['range'])
-            new_weights.append(w * prob)
+        # Implementación del paso de corrección
+        new_weights = [
+            w * self.sensor.measurement_prob_range(p.current_pose, sensor['id'], sensor['range'])
+            for w, p in zip(self.weights, self.particles)
+        ]
         self.weights = np.array(new_weights) / sum(new_weights)
 
-    def update(self, odometry, sensor):
 
-        # Paso de predicción
-        self.prediction_step(odometry)
-
-        # Paso de corrección
-        self.correction_step(sensor)
-
-        # Remuestreo usando Muestreo Estocástico Universal
-        self.systematic_resampling()
-
-    def get_mean_robot(self):
-        x = 0.0
-        y = 0.0
-        theta = 0.0
-        
-        for w, p in zip(self.weights, self.particles):
-            px, py, ptheta = p.current_pose
-            x += w * px
-            y += w * py
-            theta += w * ptheta
-            
-        x /= np.sum(self.weights)
-        y /= np.sum(self.weights)
-        theta /= np.sum(self.weights)
-        
-        mean_pos = np.array([x, y, theta])
-        mean_robot = NoisyOdometryRobot(mean_pos, self.odometry_noise_params, self.radius)
-        return mean_robot
-    
-    def get_best_particle(self):
-        best_particle = self.particles[np.argmax(self.weights)]
-        return best_particle
-
-    def get_particles_poses(self):
-        return np.vstack([p.current_pose for p in self.particles])
-    
     def systematic_resample(self):
+        # Implementación del algoritmo de Muestreo Estocástico Universal
+        new_particles = []
+
         N = len(self.weights)
-
         positions = (np.arange(N) + self.rs.rand()) / N
-
-        indexes = np.zeros(N, dtype=int)
         cumulative_sum = np.cumsum(self.weights)
+
+        seeds = self.rs.permutation(N)
         i, j = 0, 0
         while i < N:
             if positions[i] < cumulative_sum[j]:
-                indexes[i] = j
+                new_particles.append(
+                    NoisyOdometryRobot(self.particles[j].current_pose, self.odometry_noise_params, self.radius, seeds[i])
+                )
                 i += 1
             else:
                 j += 1
 
-        new_particles = []
-        for i, seed in enumerate(self.rs.permutation(N)):
-            pose = self.particles[indexes[i]].current_pose
-            p = NoisyOdometryRobot(pose, self.odometry_noise_params, self.radius, seed)
-            new_particles.append(p)
         self.particles = new_particles
         self.weights = np.ones(N) / N
         return self
+
+
+    def update(self, odometry, sensor):
+        self.prediction_step(odometry) # predicción
+        self.correction_step(sensor) # corrección
+        self.systematic_resample() # remuestreo
+
+    def get_particles_poses(self):
+        return np.vstack([p.current_pose for p in self.particles])
+
+    def get_mean_robot(self):
+        # Función que obtiene la pose promedio de las partículas
+        poses = self.get_particles_poses()
+        mean_pose = np.average(poses, axis=0, weights=self.weights)
+        mean_robot = NoisyOdometryRobot(mean_pose, self.odometry_noise_params, self.radius)
+        return mean_robot
+
+
+    
+    
+
+    

@@ -3,11 +3,11 @@ from copy import deepcopy
 import os
 import time
 from matplotlib import pyplot as plt
-import rospy
-from geometry_msgs.msg import Twist
-from sensor_msgs.msg import LaserScan
-from nav_msgs.msg import Odometry
-from std_msgs.msg import String
+# import rospy
+# from geometry_msgs.msg import Twist
+# from sensor_msgs.msg import LaserScan
+# from nav_msgs.msg import Odometry
+# from std_msgs.msg import String
 
 import numpy as np
 from scipy.spatial.transform import Rotation
