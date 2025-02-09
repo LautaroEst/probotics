@@ -4,3 +4,4 @@ from .src.mapping import *
 from .src.robots import *
 from .src.sensors import *
 from .src.slam import *
+from .src.planning import *

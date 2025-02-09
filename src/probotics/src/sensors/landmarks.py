@@ -5,7 +5,7 @@ import pandas as pd
 from ..utils import evaluate_lognormal
    
 
-class LandmarkIdentificator:
+class DeterministicLandmarkIdentificator:
 
     def __init__(self, landmarks, sensor_noise):
         self.landmarks = landmarks
@@ -26,24 +26,41 @@ class LandmarkIdentificator:
         prob += 1.e-300 # avoid round-off to zero
         return prob
     
-    # def measurement_model(self, current_pose, landmark_id):
+    @classmethod
+    def from_file(cls, filename, sensor_noise):
+        world_data = pd.read_csv(filename, sep=' ', header=None, names=["id", "x", "y"]).set_index("id")
+        return cls(world_data, sensor_noise)
 
-    #     x, y, theta = current_pose
-    #     x_landmark, y_landmark = self.landmarks.loc[landmark_id, 'mu']
+
+class GaussianLandmarkIdentificator:
+
+    def __init__(self, N_landmarks, sensor_noise):
+        self.N_landmarks = N_landmarks
+        self.landmarks = pd.DataFrame({
+            'mu': [np.zeros(2) for _ in range(N_landmarks)], # 2D position of the landmark
+            'sigma': [np.zeros((2,2)) for _ in range(N_landmarks)], # Covariance of the landmark
+            'observed': np.zeros(N_landmarks, dtype=bool) # True if the landmark has been observed
+        }, index=pd.RangeIndex(start=1, stop=N_landmarks+1, name='id'))
+        self.sensor_noise = sensor_noise
+
+    def measurement_model(self, current_pose, landmark_id):
+
+        x, y, theta = current_pose
+        x_landmark, y_landmark = self.landmarks.loc[landmark_id, 'mu']
         
-    #     # Use the current state of the particle to predict the measurment      
-    #     expected_range = np.sqrt((x - x_landmark)**2 + (y - y_landmark)**2)
-    #     expected_bearing = np.arctan2(y_landmark - y, x_landmark - x) - theta
-    #     expected_bearing = (expected_bearing + np.pi) % (2 * np.pi) - np.pi
-    #     h = np.array([expected_range, expected_bearing])
+        # Use the current state of the particle to predict the measurment      
+        expected_range = np.sqrt((x - x_landmark)**2 + (y - y_landmark)**2)
+        expected_bearing = np.arctan2(y_landmark - y, x_landmark - x) - theta
+        expected_bearing = (expected_bearing + np.pi) % (2 * np.pi) - np.pi
+        h = np.array([expected_range, expected_bearing])
         
-    #     # Compute the Jacobian H of the measurement function h wrt the landmark location
-    #     H = np.array([
-    #         [ (x_landmark - x) / expected_range, (y_landmark - y) / expected_range ],
-    #         [ (y - y_landmark) / expected_range**2, (x_landmark - x) / expected_range**2 ]
-    #     ])
+        # Compute the Jacobian H of the measurement function h wrt the landmark location
+        H = np.array([
+            [ (x_landmark - x) / expected_range, (y_landmark - y) / expected_range ],
+            [ (y - y_landmark) / expected_range**2, (x_landmark - x) / expected_range**2 ]
+        ])
         
-    #     return h, H    
+        return h, H    
     
     @classmethod
     def from_file(cls, filename, sensor_noise):

@@ -1,2 +1,2 @@
-from .landmarks import LandmarkIdentificator
+from .landmarks import DeterministicLandmarkIdentificator, GaussianLandmarkIdentificator
 from .lidar import Lidar

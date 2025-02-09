@@ -52,8 +52,6 @@ def read_tasks(tasks_cfgs):
 def evaluate_lognormal(x, mu, sigma):
     return -np.log(sigma) - 0.5 * np.log(2 * np.pi) - 0.5 * ((x - mu) / sigma) ** 2
 
-
-
 def plot_ellipse(mu, sigma, ax, color="k"):
     """
     Draws ellipse from xy of covariance matrix
@@ -72,3 +70,11 @@ def plot_ellipse(mu, sigma, ax, color="k"):
     ellipse.set_clip_box(ax.bbox)
     ellipse.set_alpha(0.2)
     ax.add_artist(ellipse)
+
+
+def plot_landmarks_with_ellipsoids(ax, robot_pose, landmarks):
+    for i, landmark in landmarks[landmarks["observed"]].iterrows():
+        plot_ellipse(landmark['mu'], landmark['sigma'], ax, color='b')
+        x = np.asarray([robot_pose[0], landmark['mu'][0]])
+        y = np.asarray([robot_pose[1], landmark['mu'][1]])
+        ax.plot(x, y, 'b--')

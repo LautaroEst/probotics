@@ -4,7 +4,7 @@ from scipy.special import softmax
 from tqdm import tqdm
 
 from ..robots.noisyodom import NoisyOdometryRobot
-from ..sensors.landmarks import LandmarkIdentificator
+from ..sensors.landmarks import DeterministicLandmarkIdentificator
 
 class ParticleFilter:
 
@@ -20,7 +20,7 @@ class ParticleFilter:
         self.N_init = N
         self.particles = particles
         self.weights = np.ones(N) / N
-        self.sensor = LandmarkIdentificator.from_file(world_data_path, measurement_noise)
+        self.sensor = DeterministicLandmarkIdentificator.from_file(world_data_path, measurement_noise)
         self.world_data_path = world_data_path
         self.odometry_noise_params = odometry_noise_params
         self.measurement_noise = measurement_noise

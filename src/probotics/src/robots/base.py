@@ -8,6 +8,7 @@ class Robot:
         self._rs = np.random.RandomState(seed)
         self._current_pose = initial_pose
         self._pose_history = []
+        self.seed = seed
 
     @property
     def current_pose(self):
@@ -15,12 +16,12 @@ class Robot:
 
     @current_pose.setter
     def current_pose(self, pose):
-        self.pose_history.append(self._current_pose)
+        self._pose_history.append(self._current_pose)
         self._current_pose = pose
     
     @property
     def pose_history(self):
-        return self._pose_history
+        return np.vstack(self._pose_history + [self._current_pose])
 
     def body2world(self, measurements):
         x, y, theta = self.current_pose
@@ -45,4 +46,3 @@ class Robot:
         circle = plt.Circle((x,y), self.radius, fill=False, color=kwargs.get('color', None))
         ax.add_artist(circle)
         ax.plot([x, x + self.radius * np.cos(theta)], [y, y + self.radius * np.sin(theta)], linewidth=2, **kwargs)
-

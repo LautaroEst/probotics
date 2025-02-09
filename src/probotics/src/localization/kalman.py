@@ -6,7 +6,7 @@ from scipy.special import softmax
 from tqdm import tqdm
 
 from ..robots.cleanodom import CleanOdometryRobot
-from ..sensors.landmarks import LandmarkIdentificator
+from ..sensors.landmarks import DeterministicLandmarkIdentificator
 
 class KalmanFilter:
 
@@ -22,11 +22,11 @@ class KalmanFilter:
     def _read_world_data(self, world_data, measurement_noise):
         if isinstance(world_data, str):
             if Path(world_data).exists():
-                self.sensor = LandmarkIdentificator.from_file(world_data, measurement_noise)
+                self.sensor = DeterministicLandmarkIdentificator.from_file(world_data, measurement_noise)
             else:
                 raise FileNotFoundError(f"File {world_data} not found")
         elif isinstance(world_data, pd.DataFrame):
-            self.sensor = LandmarkIdentificator(world_data, measurement_noise)
+            self.sensor = DeterministicLandmarkIdentificator(world_data, measurement_noise)
         else:
             raise ValueError("world_data must be a path to a file or a pandas DataFrame")
 
