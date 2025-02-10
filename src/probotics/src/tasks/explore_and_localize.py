@@ -53,12 +53,15 @@ class ParticleFilterLocalization:
         self.seed = seed
         rs = np.random.RandomState(seed)
 
-        possible_initial_poses = np.array(np.where(map2d.map_array > occupation_threshold)).T * map2d.map_resolution
+        possible_initial_poses = np.array(np.where(map2d.map_array < occupation_threshold)).T
+        possible_initial_poses[:,0] = map2d.map_array.shape[0] - possible_initial_poses[:,0]
+        possible_initial_poses = possible_initial_poses[:,[1,0]]
+        possible_initial_poses = possible_initial_poses * map2d.map_resolution
         initial_poses = possible_initial_poses[rs.permutation(len(possible_initial_poses))[:N_particles]]
         
         particles = []
         for i in range(N_particles):
-            initial_pose = np.array([initial_poses[i,1], initial_poses[i,0], rs.rand() * 2 * np.pi - np.pi])
+            initial_pose = np.array([initial_poses[i,0], initial_poses[i,1], rs.rand() * 2 * np.pi - np.pi])
             p = NoisyDiffDriveRobot(initial_pose, radius, wheels_radius, wheels_distance, alpha, seed)
             particles.append(p)
 
@@ -87,7 +90,7 @@ class ParticleFilterLocalization:
     def correction_step(self, sensor):
         # Implementación del paso de corrección
         new_weights = [
-            w * self.sensor.compute_prob_of_measure(p.current_pose, sensor['ranges'], sensor['scan_angles'])
+            w * self.sensor.compute_prob_of_measure(p.current_pose, sensor['ranges'], sensor['scan_angles'], self.map2d)
             for w, p in zip(self.weights, self.particles)
         ]
         self.weights = np.array(new_weights) / sum(new_weights)
@@ -105,8 +108,10 @@ class ParticleFilterLocalization:
         i, j = 0, 0
         while i < N:
             if positions[i] < cumulative_sum[j]:
+                noise =self.rs.randn(3) / 100
+                noise[2] = 0
                 new_particles.append(
-                    NoisyDiffDriveRobot(self.particles[j].current_pose, self.radius, self.wheels_radius, self.wheels_distance, self.alpha, seeds[i])
+                    NoisyDiffDriveRobot(self.particles[j].current_pose + noise, self.radius, self.wheels_radius, self.wheels_distance, self.alpha, seeds[i])
                 )
                 i += 1
             else:
@@ -175,44 +180,12 @@ class ExploreAndLocalize(BaseTask):
         ranges = global_state["sensor"].ranges
         angles = global_state["sensor"].scan_angles
 
-        # Identify dangerous regions
-        close_points = (ranges < self.safe_distance) & (~np.isnan(ranges))
-        if sum(close_points) > len(ranges) * 3 / 4:
-            # If the robot is surrounded by obstacles, stop
-            output = {
-                "linear_velocity": self.min_linear_velocity,
-                "angular_velocity": self.max_angular_velocity,
-            }
-            
-        elif np.any(close_points):
-            # Obstacle detected, find direction of the most open space
-            free_angles = angles[~close_points]
-            free_ranges = ranges[~close_points]
-            if len(free_angles) > 0:
-                # Rotate towards the center of the open area
-                # argmax_range = np.argmax(ranges[~close_points])
-                # target_angle = free_angles[argmax_range]
-                target_angle = find_quantile(free_angles, free_ranges, 0.5)
-                angular_velocity = np.clip(target_angle, -self.max_angular_velocity, self.max_angular_velocity)
-                linear_velocity = self.min_linear_velocity
-            else:
-                # No open space; rotate in place
-                angular_velocity = self.max_angular_velocity
-                linear_velocity = self.min_linear_velocity
-        else:
-            # No obstacles, move forward
-            angular_velocity = 0.0
-            linear_velocity = self.max_linear_velocity
-        
-        output = {
-            "linear_velocity": linear_velocity,
-            "angular_velocity": angular_velocity,
-        }
+        output = self.compute_next_action(ranges, angles)
 
         # Update the particle filter
         odometry = {
-            "linear_velocity": linear_velocity,
-            "angular_velocity": angular_velocity,
+            "linear_velocity": output["linear_velocity"],
+            "angular_velocity": output["angular_velocity"],
             "dt": global_state["sample_time"],
         }
         sensor = {
@@ -220,8 +193,32 @@ class ExploreAndLocalize(BaseTask):
             "scan_angles": angles,
         }
         self.pf.update(odometry, sensor)
+        output["particles_poses"] = self.pf.get_particles_poses()
 
         return output
     
+    def compute_next_action(self, ranges, angles):
+        ranges = ranges.copy()
+        angles = angles.copy()
+        if np.all(np.isnan(ranges)):
+            return {
+                "linear_velocity": self.min_linear_velocity,
+                "angular_velocity": 0.0,
+                "target_angle": 0.0,
+            }
+        ranges[np.isnan(ranges)] = np.max(ranges)
+        front_range = ranges[np.abs(ranges).argmin()]
+        linear_velocity = np.min([self.min_linear_velocity * front_range / self.safe_distance, self.max_linear_velocity])
+        linear_velocity = self.max_linear_velocity
+        target_angle = find_quantile(angles, ranges, 0.5)
+        angular_velocity = self.max_angular_velocity * target_angle
+        
+        
+        output = {
+            "linear_velocity": linear_velocity,
+            "angular_velocity": angular_velocity,
+            "target_angle": target_angle,
+        }
+        return output
     
         

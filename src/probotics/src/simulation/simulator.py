@@ -68,7 +68,7 @@ class Simulator:
             lidar_pose = self.lidar.current_pose
             path = []
             ranges = self.lidar.ranges
-            self._plot_realtime(robot_pose, lidar_pose, path, ranges, xlim, ylim)
+            self._plot_realtime(robot_pose, lidar_pose, self.last_outputs["particles_poses"], self.last_outputs["target_angle"], path, ranges, xlim, ylim)
 
     def _run(self, xlim=None, ylim=None):
 
@@ -109,6 +109,7 @@ class Simulator:
                 current_task.finish(state)
             else:
                 raise ValueError("Not a valid task status")
+            self.last_outputs = outputs
 
             # Aplicar acción diferencial con ruido y guardar la nueva pose
             state['robot'].apply_movement(outputs["linear_velocity"], outputs["angular_velocity"], self.sample_time)
@@ -118,6 +119,8 @@ class Simulator:
             self._plot_realtime(
                 robot_pose=state["robot"].current_pose,
                 lidar_pose=state["sensor"].current_pose,
+                particles_poses=outputs["particles_poses"],
+                target_angle=outputs["target_angle"],
                 path=[],
                 ranges=state["sensor"].ranges,
                 xlim=xlim,
@@ -135,7 +138,7 @@ class Simulator:
         plt.ion()
         self.fig.show()
 
-    def _plot_realtime(self, robot_pose, lidar_pose, path, ranges, xlim=None, ylim=None):
+    def _plot_realtime(self, robot_pose, lidar_pose, particles_poses, target_angle, path, ranges, xlim=None, ylim=None):
         
         # Clear axis
         self.ax.cla()
@@ -152,6 +155,12 @@ class Simulator:
         # Plot path
         for dot in path:
             self.ax.plot(dot[0], dot[1], "r.", markersize=4)
+        
+        # Plot particles
+        self.ax.plot(particles_poses[:, 0], particles_poses[:, 1], "g.", markersize=4)
+
+        # Plot target angle
+        self.ax.text(0.5, 0.95, f"Target angle: {(target_angle / np.pi * 180):.2f}", transform=self.ax.transAxes, ha='center', va='center')
 
         # Plot lidar
         x, y, theta = lidar_pose

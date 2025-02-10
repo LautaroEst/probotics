@@ -1,5 +1,6 @@
 
 import numpy as np
+from scipy.ndimage import gaussian_filter
 
 class Lidar:
 
@@ -75,8 +76,20 @@ class Lidar:
         return ranges
     
     def compute_prob_of_measure(self, robot_pose, ranges, angles, map2d):
-        ## TODO
-        return 1.
+        map_prob = 1 - map2d.map_array
+        # 2d Gaussian filter
+        map_prob = gaussian_filter(map_prob, sigma=0.2)
+        # prob = map_prob[map_prob.shape[0]-int(robot_pose[1]/map2d.map_resolution), int(robot_pose[0]/map2d.map_resolution)]
+        prob = 1
+        for r, a in zip(ranges, angles):
+            if np.isnan(r):
+                continue
+            x = robot_pose[0] + r * np.cos(robot_pose[2] + a)
+            y = robot_pose[1] + r * np.sin(robot_pose[2] + a)
+            if x < 0 or y < 0 or x >= map_prob.shape[1] * map2d.map_resolution or y >= map_prob.shape[0] * map2d.map_resolution:
+                return 1e-300
+            prob *= map_prob[map_prob.shape[0]-int(y/map2d.map_resolution)-1, int(x/map2d.map_resolution)-1]
+        return prob
 
 
     
