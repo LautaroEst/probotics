@@ -73,6 +73,10 @@ class Lidar:
                     break
 
         return ranges
+    
+    def compute_prob_of_measure(self, robot_pose, ranges, angles, map2d):
+        ## TODO
+        return 1.
 
 
     

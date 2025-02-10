@@ -27,4 +27,4 @@ map_resolution: 0.04 # Resolución del mapa [m]
 
 # Tareas
 tasks:
-  - explore
+  - explore_and_localize

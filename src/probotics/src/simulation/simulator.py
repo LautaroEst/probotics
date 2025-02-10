@@ -60,17 +60,17 @@ class Simulator:
         self.sample_time = sample_time
         self.seed = seed
 
-    def run(self):
+    def run(self, xlim=None, ylim=None):
         try:
-            self._run()
+            self._run(xlim=xlim, ylim=ylim)
         except KeyboardInterrupt:
             robot_pose = self.robot.current_pose
             lidar_pose = self.lidar.current_pose
             path = []
             ranges = self.lidar.ranges
-            self._plot_realtime(robot_pose, lidar_pose, path, ranges)
+            self._plot_realtime(robot_pose, lidar_pose, path, ranges, xlim, ylim)
 
-    def _run(self):
+    def _run(self, xlim=None, ylim=None):
 
         # Estado actual
         state = {
@@ -80,6 +80,7 @@ class Simulator:
             "task_status": "not_started",
             "current_task_id": 0,
             "cycle_start_time": None,
+            "sample_time": self.sample_time,
         }
         state['start_time'] = time.time()
         while time.time() - state['start_time'] < self.max_duration:
@@ -119,6 +120,8 @@ class Simulator:
                 lidar_pose=state["sensor"].current_pose,
                 path=[],
                 ranges=state["sensor"].ranges,
+                xlim=xlim,
+                ylim=ylim,
             )
 
             # Sincronizar con el tiempo de muestreo
@@ -132,7 +135,7 @@ class Simulator:
         plt.ion()
         self.fig.show()
 
-    def _plot_realtime(self, robot_pose, lidar_pose, path, ranges):
+    def _plot_realtime(self, robot_pose, lidar_pose, path, ranges, xlim=None, ylim=None):
         
         # Clear axis
         self.ax.cla()
@@ -155,6 +158,12 @@ class Simulator:
         angles = np.linspace(self.lidar.start_angle, self.lidar.end_angle, len(ranges))
         for ang, r in zip(angles, ranges):
             self.ax.plot([x, x + r * np.cos(theta+ang)], [y, y + r * np.sin(theta+ang)], "b--")
+        
+        # Set limits
+        if xlim is not None:
+            self.ax.set_xlim(xlim)
+        if ylim is not None:
+            self.ax.set_ylim(ylim)
 
         # Update plot
         self.fig.canvas.draw()

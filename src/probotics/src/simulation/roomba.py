@@ -3,11 +3,11 @@ from copy import deepcopy
 import os
 import time
 from matplotlib import pyplot as plt
-# import rospy
-# from geometry_msgs.msg import Twist
-# from sensor_msgs.msg import LaserScan
-# from nav_msgs.msg import Odometry
-# from std_msgs.msg import String
+import rospy
+from geometry_msgs.msg import Twist
+from sensor_msgs.msg import LaserScan
+from nav_msgs.msg import Odometry
+from std_msgs.msg import String
 
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -19,11 +19,28 @@ from ..sensors import Lidar
 
 class Roomba:
 
-    def __init__(self, ros_ip, ros_master_uri, tasks, lidar_offset, radius, max_duration=60, sample_time=0.1):
+    def __init__(
+        self, 
+        ros_ip, 
+        ros_master_uri, 
+        tasks, 
+        lidar_offset, 
+        radius,
+        sensor_offset=(0., 0.),
+        wheels_distance=0.2,
+        wheels_radius=0.05,
+        max_duration=60, 
+        sample_time=0.1
+    ):
 
-        # Inicializamos los gráficos
+        # Parámetros del robot y del lidar
         self.lidar_offset = lidar_offset
         self.radius = radius
+        self.sensor_offset = sensor_offset
+        self.wheels_distance = wheels_distance
+        self.wheels_radius = wheels_radius
+        
+        # Inicializamos los gráficos
         self._init_plot()
 
         # Configuración de ROS
@@ -41,7 +58,7 @@ class Roomba:
         rospy.init_node("NodeHost")
         self.cmdPub = rospy.Publisher('/auto_cmd_vel', Twist, queue_size=2)
         self.lidarSub = rospy.Subscriber('/scan', LaserScan, self.scan_callback)
-        self.odomSub = rospy.Subscriber('/odom', Twist, self.odom_callback)
+        self.odomSub = rospy.Subscriber('/odom', Odometry, self.odom_callback)
         self.last_scan = {
             "ranges": np.zeros(360),
             "angle_min": 0,
@@ -87,15 +104,18 @@ class Roomba:
         msg.angular.x, msg.angular.y, msg.angular.z = 0, 0, outputs["angular_velocity"]
         self.cmdPub.publish(msg)
 
-    def run(self):
+    def run(self, xlim=None, ylim=None):
         try:
-            self._run()
+            self._run(xlim=xlim, ylim=ylim)
         except (rospy.ROSInterruptException, KeyboardInterrupt):
             pass
 
     @property
     def robot(self):
-        return Robot(self.last_odom["pose"], radius=self.radius)
+        robot = Robot(self.last_odom["pose"], radius=self.radius)
+        robot.wheels_distance = self.wheels_distance
+        robot.wheels_radius = self.wheels_radius
+        return robot
     
     @property
     def lidar(self):
@@ -114,7 +134,7 @@ class Roomba:
         state["sensor"] = lidar
 
 
-    def _run(self):
+    def _run(self, xlim=None, ylim=None):
 
         # Estado actual
         state = {
@@ -156,7 +176,7 @@ class Roomba:
             # Publicar mensaje y graficar
             self._publish_message(outputs)
             self._update_state(state)
-            self._plot_realtime(state["robot"], state["pose_history"], state["sensor"])
+            self._plot_realtime(state["robot"], state["pose_history"], state["sensor"], xlim=xlim, ylim=ylim)
 
             # Sincronizar con el tiempo de muestreo
             n = 1
@@ -170,7 +190,7 @@ class Roomba:
         self.fig.show()
         self.pose_history = []
 
-    def _plot_realtime(self, robot, pose_history, lidar):
+    def _plot_realtime(self, robot, pose_history, lidar, xlim=None, ylim=None):
         
         # Clear axis
         self.ax.cla()
@@ -178,10 +198,6 @@ class Roomba:
         # Plot robot
         robot.plot(self.ax, color="k")
         
-        # Plot path
-        for dot in pose_history:
-            self.ax.plot(dot[0], dot[1], "r.", markersize=4)
-
         # Plot lidar
         x, y, theta = lidar.current_pose
         angles = np.linspace(lidar.start_angle, lidar.end_angle, len(lidar.ranges))
@@ -189,7 +205,13 @@ class Roomba:
             self.ax.plot([x, x + r * np.cos(theta+ang)], [y, y + r * np.sin(theta+ang)], "b--")
 
         # Update plot
-        self.ax.set_aspect('equal')
         self.ax.grid(which='both')
+    
+        # Set limits
+        if xlim is not None:
+            self.ax.set_xlim(xlim)
+        if ylim is not None:
+            self.ax.set_ylim(ylim)
+
         self.fig.canvas.draw()
 
