@@ -1,10 +1,12 @@
 
+from matplotlib import pyplot as plt
 import numpy as np
 from .base import BaseTask
 import time
 from ..mapping import Map2D
 from ..robots import NoisyDiffDriveRobot
 from ..sensors import Lidar
+from scipy.ndimage import gaussian_filter
 
 def find_quantile(support, values, q):
     """Finds the q-th quantile of a distribution with support and values"""
@@ -49,6 +51,13 @@ class ParticleFilterLocalization:
     ):
         self.N_particles = N_particles
         self.map2d = map2d
+        # map_binarized = np.where(map2d.map_array < occupation_threshold, 0, 1)
+        self.occ_llk = gaussian_filter(self.map2d.map_array, sigma=5)
+        # self.occ_llk = map2d.map_array.copy()
+        self.occ_llk[self.occ_llk > occupation_threshold] = 0.95
+        # fig, ax = plt.subplots(1, 2, figsize=(10, 10))
+        # ax[0].imshow(self.occ_llk, cmap='gray_r')
+        # ax[1].imshow(map2d.map_array, cmap='gray_r')
 
         self.seed = seed
         rs = np.random.RandomState(seed)
@@ -57,11 +66,29 @@ class ParticleFilterLocalization:
         possible_initial_poses[:,0] = map2d.map_array.shape[0] - possible_initial_poses[:,0]
         possible_initial_poses = possible_initial_poses[:,[1,0]]
         possible_initial_poses = possible_initial_poses * map2d.map_resolution
-        initial_poses = possible_initial_poses[rs.permutation(len(possible_initial_poses))[:N_particles]]
+
+        possible_initial_poses = possible_initial_poses[possible_initial_poses[:,0] > 24.5]
+        possible_initial_poses = possible_initial_poses[possible_initial_poses[:,0] < 25.5]
+        possible_initial_poses = possible_initial_poses[possible_initial_poses[:,1] > 9.5]
+        possible_initial_poses = possible_initial_poses[possible_initial_poses[:,1] < 10.5]
+        
+        # n = len(possible_initial_poses)
+        # initial_poses = []
+        # for i in range(1, np.ceil(N_particles / n).astype(int)+1):
+        #     initial_poses.append(rs.permutation(n))
+        # initial_poses.append(rs.permutation(n)[:np.min([n,N_particles]) % np.max([n,N_particles])])
+        # import pdb; pdb.set_trace()
+        # initial_poses = np.hstack(initial_poses)
+        
+        
+        # initial_poses = possible_initial_poses[rs.permutation(len(possible_initial_poses))[:N_particles]]
+        # initial_poses = possible_initial_poses[rs.choice(len(possible_initial_poses), N_particles)]
+        initial_poses = rs.randn(N_particles,2) * 0.1 + np.array([25, 10])
+        # import pdb; pdb.set_trace()
         
         particles = []
         for i in range(N_particles):
-            initial_pose = np.array([initial_poses[i,0], initial_poses[i,1], rs.rand() * 2 * np.pi - np.pi])
+            initial_pose = np.array([initial_poses[i,0], initial_poses[i,1], rs.randn() * 0.0001])
             p = NoisyDiffDriveRobot(initial_pose, radius, wheels_radius, wheels_distance, alpha, seed)
             particles.append(p)
 
@@ -89,8 +116,10 @@ class ParticleFilterLocalization:
 
     def correction_step(self, sensor):
         # Implementación del paso de corrección
+        if np.all(np.isnan(sensor['ranges'])):
+            return
         new_weights = [
-            w * self.sensor.compute_prob_of_measure(p.current_pose, sensor['ranges'], sensor['scan_angles'], self.map2d)
+            w * self.sensor.compute_prob_of_measure(p.current_pose, sensor['ranges'], sensor['scan_angles'], self.occ_llk, self.map2d.map_resolution)
             for w, p in zip(self.weights, self.particles)
         ]
         self.weights = np.array(new_weights) / sum(new_weights)
@@ -108,8 +137,9 @@ class ParticleFilterLocalization:
         i, j = 0, 0
         while i < N:
             if positions[i] < cumulative_sum[j]:
-                noise =self.rs.randn(3) / 100
-                noise[2] = 0
+                # noise =self.rs.randn(3) / 1000
+                # noise[2] = 0
+                noise = 0
                 new_particles.append(
                     NoisyDiffDriveRobot(self.particles[j].current_pose + noise, self.radius, self.wheels_radius, self.wheels_distance, self.alpha, seeds[i])
                 )

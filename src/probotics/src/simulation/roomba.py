@@ -108,6 +108,7 @@ class Roomba:
         try:
             self._run(xlim=xlim, ylim=ylim)
         except (rospy.ROSInterruptException, KeyboardInterrupt):
+            print("finished")
             pass
 
     @property

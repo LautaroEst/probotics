@@ -1,5 +1,7 @@
-ros_ip: 127.0.0.1
-ros_master_uri: http://127.0.0.1:11311
+# ros_ip: 127.0.0.1
+# ros_master_uri: http://127.0.0.1:11311
+ros_ip: 192.168.0.103
+ros_master_uri: http://192.168.0.102:11311
 
 max_duration: 300 # Duración máxima de la simulación [s]
 sample_time: 0.1 # Tiempo de muestreo [s]
